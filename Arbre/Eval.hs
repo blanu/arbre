@@ -14,7 +14,7 @@ import Data.Typeable
 import Data.Data
 import qualified Data.Map as M
 
-import Arbre.Program
+import Arbre.Program hiding (Object)
 import Arbre.Path
 import qualified Arbre.Context as C
 import Arbre.Native
@@ -58,7 +58,7 @@ printObject :: Object -> String
 printObject (Object defMap) = (show defMap)
 
 eval :: Computation -> Expression
-eval (Computation context lit@(LiteralExp _)) = lit
+eval (Computation context lit@(ObjectExp _)) = lit
 eval (Computation context (Symref symref)) =
   C.resolve symref context
 eval (Computation context (Apply (Block args exp) params)) =
@@ -81,7 +81,7 @@ eval (Computation context (Call name params)) =
     otherwise -> Error $ "Call to a non-function " ++ name
 
 evalToLiteral :: Computation -> Expression
-evalToLiteral (Computation context lit@(LiteralExp _)) = lit
+evalToLiteral (Computation context lit@(ObjectExp _)) = lit
 evalToLiteral (Computation context error@(Error _)) = error
 evalToLiteral comp@(Computation context exp) = evalToLiteral $ Computation context $ eval comp
 

@@ -1,43 +1,45 @@
 import Arbre.Program
+import Arbre.Box
 import Arbre.Eval
+import Arbre.Short
 
-testLiteral = ObjectDef [Def "main" (LiteralExp $ IntegerLit 486)]
+testLiteral = ObjectDef [Def "main" (num 486)]
 testSymref = ObjectDef [
-    Def "x" (LiteralExp $ IntegerLit 486),
+    Def "x" (num 486),
     Def "main" (Symref "x")
   ]
 testApply = ObjectDef [
-    Def "main" (Apply (Block ["x"] $ Symref "x") [LiteralExp $ IntegerLit 486])
+    Def "main" (Apply (Block ["x"] $ Symref "x") [num 486])
   ]
 testApply2 = ObjectDef [
-    Def "x" (LiteralExp $ IntegerLit 486),
+    Def "x" (num 486),
     Def "main" (Apply (Block ["y"] $ Symref "y") [Symref "x"])
   ]
 testNative = ObjectDef [
-    Def "main" (NativeCall "+" [(LiteralExp $ IntegerLit 1), (LiteralExp $ IntegerLit 2)])
+    Def "main" (NativeCall "+" [(num 1), (num 2)])
   ]
 testWrappedNative = ObjectDef [
-    Def "main" (Call "+" [(LiteralExp $ IntegerLit 1), (LiteralExp $ IntegerLit 2)])
+    Def "main" (Call "+" [(num 1), (num 2)])
   ]
 testCall = ObjectDef [
-    Def "addone" (BlockExp $ Block ["x"] (NativeCall "+" [(LiteralExp $ IntegerLit 1), (Symref "x")])),
-    Def "main" (Call "addone" [(LiteralExp $ IntegerLit 2)])
+    Def "addone" (BlockExp $ Block ["x"] (NativeCall "+" [(num 1), (Symref "x")])),
+    Def "main" (Call "addone" [(num 2)])
   ]
 
 testAdd = ObjectDef [
-    Def "main" (Call "+" [(LiteralExp $ IntegerLit 137), (LiteralExp $ IntegerLit 349)])
+    Def "main" (Call "+" [(num 137), (num 349)])
   ]
 testAdd2 = ObjectDef [
     Def "main" (Call "==" [
-        (Call "+" [(LiteralExp $ IntegerLit 137), (LiteralExp $ IntegerLit 349)]),
-        (LiteralExp $ IntegerLit 486)
+        (Call "+" [(num 137), (num 349)]),
+        (num 486)
       ]
     )
   ]
 testMult = ObjectDef [
     Def "main" (Call "*" [
-        (LiteralExp $ IntegerLit 137),
-        (LiteralExp $ IntegerLit 349)
+        (num 137),
+        (num 349)
       ]
     )
   ]
@@ -45,21 +47,21 @@ testNested = ObjectDef [
     Def "main" (Call "==" [
         (Call "*" [
             (Call "+" [
-                (LiteralExp $ IntegerLit 2),
+                (num 2),
                 (Call "*" [
-                    (LiteralExp $ IntegerLit 4),
-                    (LiteralExp $ IntegerLit 6)
+                    (num 4),
+                    (num 6)
                   ])
               ]),
             (Call "+" [
                 (Call "+" [
-                    (LiteralExp $ IntegerLit 3),
-                    (LiteralExp $ IntegerLit 5)
+                    (num 3),
+                    (num 5)
                   ]),
-                (LiteralExp $ IntegerLit 7)
+                (num 7)
               ])
           ]),
-          (LiteralExp $ IntegerLit 390)
+          (num 390)
       ]
     )
   ]
@@ -71,8 +73,8 @@ testSquare = ObjectDef [
           ]
       )),
     Def "main" (Call "==" [
-        (Call "square" [(LiteralExp $ IntegerLit 21)]),
-        (LiteralExp $ IntegerLit 441)
+        (Call "square" [(num 21)]),
+        (num 441)
       ]
     )
   ]
@@ -90,8 +92,8 @@ testSumOfSquares = ObjectDef [
           ]
       )),
     Def "main" (Call "==" [
-        (Call "sumOfSquares" [LiteralExp $ IntegerLit 4, LiteralExp $ IntegerLit 3]),
-        (LiteralExp $ IntegerLit 25)
+        (Call "sumOfSquares" [num 4, num 3]),
+        (num 25)
       ]
     )
   ]

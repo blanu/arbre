@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import qualified Data.List as L
 
 import Arbre.Program
+import Arbre.Box
 import Arbre.View
 
 printViews :: Views -> IO()
@@ -28,8 +29,8 @@ printDef views (Def name defExpr) =
     name ++ (printDefExpression views "" defExpr) ++ "\n\n"
 
 printDefExpression :: Views -> String -> Expression -> String
-printDefExpression views ind (LiteralExp literal) =
-    ":" ++ "\n" ++ (printLiteral literal)
+printDefExpression views ind (ObjectExp object) =
+    ":" ++ "\n" ++ (printObject object)
 --printDefExpression views ind (BlockExpression params block) =
 --    "(" ++ (printParams params) ++ "):" ++ "\n" ++ (printBlock views "  " block)
 
@@ -40,7 +41,7 @@ printBlock :: Views -> String -> Expression -> String
 printBlock views ind expr = ind ++ printExpression views ind expr
 
 printExpression :: Views -> String -> Expression -> String
-printExpression views ind (LiteralExp literal) = printLiteral literal
+printExpression views ind (ObjectExp obj) = printObject obj
 --printExpression views ind (BlockExpression block) = printNestedBlock views ind block
 --printExpression views ind (SymdefExpression symdef) = printSymdef symdef
 printExpression views ind symref@(Symref _) = printSymref symref
@@ -87,6 +88,14 @@ printArgs views ind args = L.intercalate ", " (map (printArg views ind) args)
 
 printArg :: Views -> String -> Expression -> String
 printArg views ind arg = printExpression views ind arg
+
+printObject :: Object -> String
+printObject (Module mod) = "<module>"
+printObject (Object state def) = "<object: " ++ printState state ++ ">"
+
+printState :: State -> String
+printState (ObjectState obj) =  printObject obj
+printState (LiteralState lit) = printLiteral lit
 
 printLiteral :: Literal -> String
 printLiteral (StringLit literal) = show literal

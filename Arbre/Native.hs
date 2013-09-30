@@ -1,13 +1,15 @@
 module Arbre.Native
 (
   builtins,
-  wrapNatives
+  wrapNatives,
+  numdef
 )
 where
 
 import qualified Data.Map as M
 
 import Arbre.Program
+import Arbre.Box
 
 type Native = ([Expression] -> Expression)
 
@@ -25,20 +27,42 @@ builtinParams = M.fromList [
     ("==", ["a", "b"])
   ]
 
+numdef :: ObjectDef
+numdef = ObjectDef [
+        Def "+" (BlockExp $ Block ["x"] (NativeCall "+" [(Symref "value"), (Symref "x")])),
+        Def "*" (BlockExp $ Block ["x"] (NativeCall "*" [(Symref "value"), (Symref "x")])),
+        Def "==" (BlockExp $ Block ["x"] (NativeCall "==" [(Symref "value"), (Symref "x")]))
+    ]
+
 add :: Native
-add ((LiteralExp (IntegerLit a)):(LiteralExp (IntegerLit b)):[]) =
-  LiteralExp $ IntegerLit $ a+b
-add params = Error $ "Type error, not integer literals" ++ (show params)
+add params@(a:b:[]) = do
+    let x = unboxInteger a
+    let y = unboxInteger b
+    case (x,y) of
+        (Nothing,_) -> integerError params
+        (_,Nothing) -> integerError params
+        (Just i, Just j) -> boxInteger (i+j) numdef
+add params = integerError params
 
 mult :: Native
-mult ((LiteralExp (IntegerLit a)):(LiteralExp (IntegerLit b)):[]) =
-  LiteralExp $ IntegerLit $ a*b
-mult params = Error $ "Type error, not integer literals" ++ (show params)
+mult params@(a:b:[]) = do
+    let x = unboxInteger a
+    let y = unboxInteger b
+    case (x,y) of
+        (Nothing,_) -> integerError params
+        (_,Nothing) -> integerError params
+        (Just i, Just j) -> boxInteger (i*j) numdef
+mult params = integerError params
 
 eq :: Native
-eq ((LiteralExp (IntegerLit a)):(LiteralExp (IntegerLit b)):[]) =
-  LiteralExp $ BooleanLit $ a==b
-eq params = Error $ "Type error, not integer literals" ++ (show params)
+eq params@(a:b:[]) = do
+    let x = unboxInteger a
+    let y = unboxInteger b
+    case (x,y) of
+        (Nothing,_) -> integerError params
+        (_,Nothing) -> integerError params
+        (Just i, Just j) -> boxBoolean (i==j) numdef
+eq params = integerError params
 
 wrapNatives :: (M.Map String Native) -> (M.Map String Expression)
 wrapNatives natives = M.mapWithKey wrapNative natives
