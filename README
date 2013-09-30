@@ -5,26 +5,27 @@ Unlike most languages, Arbre does not have a fixed concrete syntax or parser.
 
 There are two dialects of Arbre: formal and colloquial.
 
-Formal Arbre can be encoded as either JSON or YAML.
-Colloquial Arbre is generated from formal Arbre and has a pleasant, python/ruby-like syntax.
+Formal Arbre can be encoded as either JSON or YAML. The encoding format has now moved to Haskell literal data structures.
+Colloquial Arbre is generated from formal Arbre and has a pleasant syntax inspired by python and ruby.
 
-The end goal is to develop an editor that displays colloquial Arbre that is generated live from an underlying formal equivalent. The formal version what the editor acts on and saves.
+The end goal is to develop an editor that displays colloquial Arbre that is generated live from an underlying formal equivalent.
+The formal version is what the editor acts on and saves.
 
 = Semantics =
-Arbre is a functional language. Each function definition can make one function call, which may have arguments that are also functions that must be unwound. Functions can also take blocks are arguments.
+Arbre is a pure functional language. Each function definition can make one function call, which may have arguments that are also functions that must be unwound. Functions can also take blocks are arguments.
 
 There are no special forms or keywords, only function calls, symbolic references, literals, and blocks.
 
-There are no flow control constructs such as loops or non-local returns.
+There are no builtin flow control constructs such as loops or non-local returns.
 
 Values are immutable.
 
-The language can be extended by defining new Arbre functions, which can be written in Arbre or can wrap native functions, which are written in the host language (currently python).
+The language can be extended by defining new Arbre functions, which can be written in Arbre or can wrap native functions, which are written in the host language (currently Haskell).
 
 Syntax can be extended by attaching views to function definitions. When the code is translated from formal to colloquial Arbre, the views are used to rewrite the code to apply syntax such as keywords, infix operators, and nested block formatting (for example, indentation).
 
 = Implementation =
-The current actively development version of the interpreter is written in python. There is also some work on a node.js Javascript interpreter.
+The current actively development version of the interpreter is written in Haskell.
 
 There is no VM. The interpreter walks the AST and does tree transformations to execute computations.
 
@@ -37,7 +38,7 @@ Ruby - leader of the pleasant, concise syntax revolution
 Haskell - inventor of monads, first implementation of software transactional memory in a language
 Clojure - Persistent collections, concurrency semantics, the most modern lisp
 
-Friend languages you should check out if you like Arbre:
+Related languages you should check out if you are interested in Arbre:
 
 CoffeeScript - Javascript, but without all of the badness and brokenness of Javascript
 http://coffeescript.org/
