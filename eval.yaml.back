@@ -1,0 +1,16 @@
+testEval:
+  type: method
+  params: []
+  code:
+    [func, [eval, [
+      [block, {
+        type: method,
+        params: [size],
+        code:
+          [func, [send, [
+            [symref, size],
+            [symref, io]
+          ]]]
+      }],
+      [literal, [[literal, 2]]]
+    ]]]

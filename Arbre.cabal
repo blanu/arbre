@@ -1,0 +1,62 @@
+Name:                Arbre
+Version:             1.0
+Description:         Arbre is a programming language
+License:             GPL
+License-file:        LICENSE
+Author:              Brandon Wiley
+Maintainer:          brandon@blanu.net
+Build-Type:          Simple
+Cabal-Version:       >=1.8
+
+Library
+  Exposed-modules:   Arbre.Program, Arbre.Print, Arbre.Load, Arbre.Eval, Arbre.Context, Arbre.Native
+  Build-Depends:     base >= 3 && < 5, cereal, ghc-prim, binary, containers, filepath, json
+
+--Executable create
+--  Main-is:           Arbre/Create.hs
+--  Build-Depends:     base >= 3 && < 5, Arbre, cereal, ghc-prim, binary, containers, json
+
+Executable print
+  Main-is:           Arbre/print.hs
+  Build-Depends:     base >= 3 && < 5, Arbre, cereal, ghc-prim, binary, containers, json, filepath
+
+Executable test
+  Main-is:           Arbre/test.hs
+  Build-Depends:     base >= 3 && < 5, Arbre, cereal, ghc-prim, binary, containers, json, filepath
+
+--test-suite crypto
+--  type: exitcode-stdio-1.0
+--  main-is: TestCrypto.hs
+--  ghc-options: -w -threaded -rtsopts -with-rtsopts=-N
+--  hs-source-dirs: tests
+
+--  build-depends:
+--    base,
+--    Dust,
+--    HUnit >= 1.2,
+--    test-framework       >= 0.6,
+--    test-framework-hunit >= 0.2,
+--    test-framework-th,
+--    bytestring,
+--    AES,
+--    cereal,
+--    ghc-prim
+
+--test-suite core
+--  type: exitcode-stdio-1.0
+--  main-is: TestCore.hs
+--  ghc-options: -w -threaded -rtsopts -with-rtsopts=-N
+--  hs-source-dirs: tests
+
+--  build-depends:
+--    base,
+--    Dust,
+--    HUnit >= 1.2,
+--    test-framework       >= 0.6,
+--    test-framework-hunit >= 0.2,
+--    test-framework-th,
+--    bytestring,
+--    AES,
+--    cereal,
+--    ghc-prim,
+--    binary

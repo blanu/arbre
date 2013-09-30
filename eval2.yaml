@@ -1,0 +1,7 @@
+testLiteral:
+  type: method
+  params: [x]
+  code:
+    [func, [eval, [
+      [literal, 0]
+    ]]]

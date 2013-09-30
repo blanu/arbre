@@ -1,0 +1,12 @@
+testEval:
+  type: method
+  params: []
+  code:
+    [func, [eval, [
+      [block, {
+        type: method,
+        params: [],
+        code:
+          [literal, 0]
+      }]
+    ]]]
