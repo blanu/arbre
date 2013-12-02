@@ -3,7 +3,14 @@
 module Arbre.Print
 (
     printViews,
-    printProg
+    printProg,
+    printExpression,
+    printObjectFull,
+    printArgs,
+    printComputation,
+    printContext,
+    printPairs,
+    printMapping
 )
 where
 
@@ -13,6 +20,17 @@ import qualified Data.List as L
 import Arbre.Program
 import Arbre.Box
 import Arbre.View
+import Arbre.Context
+
+printPairs :: [(String,Expression)] -> String
+printPairs pairs = "(" ++ (L.intercalate "," $ map (printFullBinding "") pairs) ++ ")"
+
+printComputation :: Computation -> String
+printComputation (Computation context exp) = "<<... | " ++ printExpression (Views []) "" exp
+
+printObjectFull :: Views -> String -> Object -> String
+printObjectFull views ind (Module defMap) = printObjectDef views defMap ++ "\n"
+printObjectFull views ind (Object state defMap) = show state ++ ": " ++ printObjectDef views defMap
 
 printViews :: Views -> IO()
 printViews views = putStrLn $ show views
@@ -20,19 +38,23 @@ printViews views = putStrLn $ show views
 printProg :: Views -> ObjectDef -> IO()
 printProg views (ObjectDef defs) = putStrLn $ printDefs views defs
 
+printObjectDef :: Views -> ObjectDef -> String
+printObjectDef views (ObjectDef defs) = printDefs views defs
+
 printDefs :: Views -> [Def] -> String
 printDefs views [] = ""
-printDefs views (def:defs) = printDef views def ++ printDefs views defs
+printDefs views defs = L.intercalate "\n" $ map (printDef views) defs
 
 printDef :: Views -> Def -> String
 printDef views (Def name defExpr) =
-    name ++ (printDefExpression views "" defExpr) ++ "\n\n"
+    name ++ ": " ++ (printExpression views "" defExpr)
 
-printDefExpression :: Views -> String -> Expression -> String
-printDefExpression views ind (ObjectExp object) =
-    ":" ++ "\n" ++ (printObject object)
---printDefExpression views ind (BlockExpression params block) =
---    "(" ++ (printParams params) ++ "):" ++ "\n" ++ (printBlock views "  " block)
+printEnvironment :: Environment -> String
+printEnvironment Lex = "^"
+printEnvironment Dyn = "$"
+printEnvironment Self = "~"
+printEnvironment Value = "&"
+printEnvironment Local = ""
 
 printParams :: [String] -> String
 printParams params = L.intercalate ", " params
@@ -42,21 +64,59 @@ printBlock views ind expr = ind ++ printExpression views ind expr
 
 printExpression :: Views -> String -> Expression -> String
 printExpression views ind (ObjectExp obj) = printObject obj
---printExpression views ind (BlockExpression block) = printNestedBlock views ind block
---printExpression views ind (SymdefExpression symdef) = printSymdef symdef
-printExpression views ind symref@(Symref _) = printSymref symref
+printExpression views ind (BlockExp block) = printNestedBlock views ind block
+printExpression views ind (Symdef symdef) = printEnvironment Dyn ++ symdef
+printExpression views ind symref@(Symref env sym) = printEnvironment env ++ sym
 printExpression views ind call@(Call _ _) = printCall views ind call
+printExpression views ind (Apply clos@(Closure _ _ _ _ _) params) =
+  printClosure views ind clos ++ " . (" ++ printArgs views ind params ++ ")"
+printExpression views ind clos@(Closure _ _ _ _ _) = printClosure views ind clos
+printExpression views ind call@(NativeCall _ _) = printNativeCall views ind call  
+printExpression views ind (Error message) = "<error: " ++ message ++ ">"
+printExpression views ind (Mutation Define sym value) = ind ++ (printExpression views ind sym) ++ " := " ++ printExpression views ind value
+printExpression views ind (Mutation Set sym value) = ind ++ (printExpression views ind sym) ++ " = " ++ printExpression views ind value
+printExpression views ind (Event Print value) = ind ++ "io <- " ++ printExpression views ind value
+printExpression views ind (Combine a b) = ind ++ (printExpression views ind a) ++ "; " ++ printExpression views ind b
+printExpression views ind exp = "<print not implemented>" ++ show exp
+
+printClosure :: Views -> String -> Expression -> String
+printClosure views ind (Closure lex dyn self value block) =
+  "{...|" ++ printNestedBlock views ind block ++ "}"
+--printClosure views ind (Closure lex dyn self value block) =
+--  "{" ++ printMapping Lex lex ++ ", " ++ printMapping Dyn dyn ++ ", " ++ printMapping Self self ++ "," ++ printMapping Value value ++ "|" ++ printNestedBlock views ind block ++ "}"
+
+printContext :: Context -> String
+printContext (Context lex dyn self value local) =
+  "{" ++ printMapping Lex lex ++ ", " ++ printMapping Dyn dyn ++ ", " ++ printMapping Self self ++ "," ++ printMapping Value value ++ "," ++ printMapping Local local ++ "}"
+
+printMapping :: Environment -> Mapping -> String
+printMapping env (Mapping mapping) = L.intercalate "," $ map (printBinding (printEnvironment env)) (M.toList mapping)
+
+printBinding :: String -> (String, Expression) -> String
+--printBinding prefix (name, value) = prefix ++ name ++ ": " ++ printExpression (Views []) "" value
+printBinding prefix (name, value) = prefix ++ name
+
+printFullBinding :: String -> (String, Expression) -> String
+printFullBinding prefix (name, value) = prefix ++ name ++ ": " ++ printExpression (Views []) "" value
 
 printCall :: Views -> String -> Expression -> String
-printCall views ind call@(Call name args) =
+printCall views ind call@(Call (Symref env name) args) =
     case (getView views name) of
         Just view -> printCallWithView views ind view call
         Nothing -> name ++ "(" ++ (printArgs views ind args) ++ ")"
+printCall views ind exp = "<unimplemented call> " ++ show exp
 
 printCallWithView :: Views -> String -> View -> Expression -> String
 printCallWithView views ind (View name []) call@(Call _ args) = ""
 printCallWithView views ind (View name (part:parts)) call@(Call _ args) =
     printViewPartWithCall views ind part args ++ " " ++ printCallWithView views ind (View name parts) call
+
+printNativeCall :: Views -> String -> Expression -> String
+printNativeCall views ind call@(NativeCall name args) =
+    case (getView views name) of
+        Just view -> printCallWithView views ind view call
+        Nothing -> "#" ++ name ++ "(" ++ (printArgs views ind args) ++ ")"
+printNativeCall views ind exp = "<unimplemented native call> " ++ show exp
 
 printViewPartWithCall :: Views -> String -> ViewPart -> [Expression] -> String
 printViewPartWithCall views ind (SymrefView index) args =
@@ -91,7 +151,7 @@ printArg views ind arg = printExpression views ind arg
 
 printObject :: Object -> String
 printObject (Module mod) = "<module>"
-printObject (Object state def) = "<object: " ++ printState state ++ ">"
+printObject (Object state def) = "@" ++ printState state
 
 printState :: State -> String
 printState (ObjectState obj) =  printObject obj
@@ -109,11 +169,8 @@ printLiteral (MapLit literal) = "map"
 --printSymdef :: Symdef -> String
 --printSymdef (Symdef symdef) = symdef
 
-printSymref :: Expression -> String
-printSymref (Symref symref) = symref
-
 printNestedBlock :: Views -> String -> Block -> String
-printNestedBlock views ind (Block allparams@(param:params) expr) = "{" ++ (printParams allparams) ++ ": " ++ (printExpression views ind expr) ++ "}"
+printNestedBlock views ind (Block allparams@(param:params) expr) = "{with " ++ (printParams allparams) ++ ": " ++ (printExpression views ind expr) ++ "}"
 printNestedBlock views ind (Block [] expr) = "{" ++ printExpression views ind expr ++ "}"
 
 --data LiveBlock = LiveBlock LexicalContext DynamicContext Block deriving (Eq, Show, Typeable, Data)

@@ -3,58 +3,58 @@ import Arbre.Box
 import Arbre.Eval
 import Arbre.Short
 
-testLiteral = ObjectDef [Def "main" (num 486)]
-testSymref = ObjectDef [
+testLiteral = modul [Def "main" (num 486)]
+testSymref = modul [
     Def "x" (num 486),
-    Def "main" (Symref "x")
+    Def "main" $ self "x"
   ]
-testApply = ObjectDef [
-    Def "main" (Apply (Block ["x"] $ Symref "x") [num 486])
+testApply = modul [
+    Def "main" (Apply (block ["x"] $ Symref Local "x") [num 486])
   ]
-testApply2 = ObjectDef [
+testApply2 = modul [
     Def "x" (num 486),
-    Def "main" (Apply (Block ["y"] $ Symref "y") [Symref "x"])
+    Def "main" (Apply (block ["y"] $ Symref Local "y") [Symref Self "x"])
   ]
-testNative = ObjectDef [
+testNative = modul [
     Def "main" (NativeCall "+" [(num 1), (num 2)])
   ]
-testWrappedNative = ObjectDef [
-    Def "main" (Call "+" [(num 1), (num 2)])
+testWrappedNative = modul [
+    Def "main" (Call (env "+") [(num 1), (num 2)])
   ]
-testCall = ObjectDef [
-    Def "addone" (BlockExp $ Block ["x"] (NativeCall "+" [(num 1), (Symref "x")])),
-    Def "main" (Call "addone" [(num 2)])
+testCall = modul [
+    Def "addone" (block ["x"] (NativeCall "+" [(num 1), (local "x")])),
+    Def "main" (Call (self "addone") [(num 2)])
   ]
 
-testAdd = ObjectDef [
-    Def "main" (Call "+" [(num 137), (num 349)])
+testAdd = modul [
+    Def "main" (Call (env "+") [(num 137), (num 349)])
   ]
-testAdd2 = ObjectDef [
-    Def "main" (Call "==" [
-        (Call "+" [(num 137), (num 349)]),
+testAdd2 = modul [
+    Def "main" (Call (env "==") [
+        (Call (env "+") [(num 137), (num 349)]),
         (num 486)
       ]
     )
   ]
-testMult = ObjectDef [
-    Def "main" (Call "*" [
+testMult = modul [
+    Def "main" (Call (env "*") [
         (num 137),
         (num 349)
       ]
     )
   ]
-testNested = ObjectDef [
-    Def "main" (Call "==" [
-        (Call "*" [
-            (Call "+" [
+testNested = modul [
+    Def "main" (Call (env "==") [
+        (Call (env "*") [
+            (Call (env "+") [
                 (num 2),
-                (Call "*" [
+                (Call (env "*") [
                     (num 4),
                     (num 6)
                   ])
               ]),
-            (Call "+" [
-                (Call "+" [
+            (Call (env "+") [
+                (Call (env "+") [
                     (num 3),
                     (num 5)
                   ]),
@@ -65,699 +65,555 @@ testNested = ObjectDef [
       ]
     )
   ]
-testSquare = ObjectDef [
-    Def "square" (BlockExp $ Block ["x"] (
-        Call "*" [
-            (Symref "x"),
-            (Symref "x")
+testSquare = modul [
+    Def "square" (block ["x"] (
+        Call (env "*") [
+            (local "x"),
+            (local "x")
           ]
       )),
-    Def "main" (Call "==" [
-        (Call "square" [(num 21)]),
+    Def "main" (Call (env "==") [
+        (Call (self "square") [(num 21)]),
         (num 441)
       ]
     )
   ]
-testSumOfSquares = ObjectDef [
-    Def "square" (BlockExp $ Block ["x"] (
-        Call "*" [
-            (Symref "x"),
-            (Symref "x")
+testSumOfSquares = modul [
+    Def "square" (block ["x"] (
+        Call (env "*") [
+            (local "x"),
+            (local "x")
           ]
       )),
-    Def "sumOfSquares" (BlockExp $ Block ["i", "j"] (
-        Call "+" [
-            (Call "square" [Symref "i"]),
-            (Call "square" [Symref "j"])
+    Def "sumOfSquares" (block ["i", "j"] (
+        Call (env "+") [
+            (Call (self "square") [local "i"]),
+            (Call (self "square") [local "j"])
           ]
       )),
-    Def "main" (Call "==" [
-        (Call "sumOfSquares" [num 4, num 3]),
+    Def "main" (Call (env "==") [
+        (Call (self "sumOfSquares") [num 4, num 3]),
         (num 25)
       ]
     )
   ]
+testAbs = modul [
+    Def "abs" (block ["x"] (
+        Call (env "if") [
+            (Call (env ">") [local "x", num 0]),
+            (block [] $ env "x"),
+            (block [] $ Call (env "*") [env "x", num (-1)])
+          ]
+     )),
+    Def "main" (Call (env "==") [
+        (Call (self "abs") [num 5]),
+        (num 5)
+      ]
+     )
+  ]
+testAbs2 = modul [
+    Def "abs" (block ["x"] (
+        Call (env "if") [
+            (Call (env ">") [local "x", num 0]),
+            (block [] $ env "x"),
+            (block [] $ Call (env "*") [env "x", num (-1)])
+          ]
+     )),
+    Def "main" (Call (env "==") [
+        (Call (self "abs") [num (-5)]),
+        (num 5)
+      ]
+     )
+  ]
+testIf = modul [
+    Def "truth" true,
+    Def "main" (Call (env "==") [
+        Call (env "if") [
+            (self "truth"),
+            (block [] $ num 5),
+            (block [] $ num 0)
+          ],
+        (num 5)
+      ]
+     )
+  ]
+testIf2 = modul [
+    Def "truth" false,
+    Def "main" (Call (env "==") [
+        Call (env "if") [
+            (self "truth"),
+            (block [] $ num 5),
+            (block [] $ num 0)
+          ],
+        (num 0)
+      ]
+     )
+  ]
+testAnd = modul [
+    Def "main" (Call (env "and") [true, false])
+  ]
+testAnd2 = modul [
+    Def "main" (Call (env "and") [true, true])
+  ]
+testAnd3 = modul [
+    Def "main" (Call (env "and") [false, false])
+  ]
+testOr = modul [
+    Def "main" (Call (env "or") [true, false])
+  ]
+testOr2 = modul [
+    Def "main" (Call (env "or") [true, true])
+  ]
+testOr3 = modul [
+    Def "main" (Call (env "or") [false, false])
+  ]
+testNot = modul [
+    Def "main" (Call (env "not") [true])
+  ]
+testNot2 = modul [
+    Def "main" (Call (env "not") [false])
+  ]
 
-main = do
-  evalMainObjectDef testLiteral
-  evalMainObjectDef testSymref
-  evalMainObjectDef testApply
-  evalMainObjectDef testApply2
-  evalMainObjectDef testNative
-  evalMainObjectDef testWrappedNative
-  evalMainObjectDef testCall
+testSqrt = modul [
+    Def "square" (block ["victim"] (
+        Call (env "*f") [
+            (local "victim"),
+            (local "victim")
+          ]
+      )),
+    Def "abs" (block ["number"] (
+        Call (env "if") [
+            (Call (env ">f") [local "number", float 0]),
+            (block [] $ env "number"),
+            (block [] $ Call (env "*f") [env "number", float (-1)])
+          ]
+     )),
+    Def "goodenough" (block ["guess3", "match"] (
+        Call (env ">f") [
+            (float 0.001),
+            (Call (self "abs") [
+                (Call (env "-f") [
+                    (Call (self "square") [
+                        (local "guess3")
+                    ]),
+                    (local "match")
+                ])
+           ])
+        ]
+    )),
+    Def "average" (block ["i", "j"]
+        (Call (env "/f") [
+            (Call (env "+f") [
+                (local "i"),
+                (local "j")
+            ]),
+            (float 2)
+        ])
+       ),
+    Def "improve" (block ["guess2", "desired"]
+        (Call (self "average") [
+            (local "guess2"),
+            (Call (env "/f") [
+                (local "desired"),
+                (local "guess2")
+            ])
+           ])
+        ),
+    Def "sqrtiter" (block ["guess1", "goal"]
+        (Call (env "if") [
+            (Call (self "goodenough") [local "guess1", local "goal"]),
+            (block [] $ env "guess1"),
+            (block [] $ (Call (self "sqrtiter") [
+                    (Call (self "improve") [env "guess1", env "goal"]),
+                    (env "goal")
+                ]))
+           ]
+       )),
+    Def "sqrt" (block ["target"] (Call (self "sqrtiter") [float 1, local "target"])),
+    Def "main" (Call (self "sqrt") [float 9])
+  ]
 
-  evalMainObjectDef testAdd
-  evalMainObjectDef testAdd2
-  evalMainObjectDef testMult
-  evalMainObjectDef testNested
-  evalMainObjectDef testSquare
-  evalMainObjectDef testSumOfSquares
+testSqrt2 = modul [
+    Def "square" (block ["x"] (
+        Call (env "*f") [
+            (local "x"),
+            (local "x")
+          ]
+      )),
+    Def "abs" (block ["x"] (
+        Call (env "if") [
+            (Call (env ">f") [local "x", float 0]),
+            (block [] $ env "x"),
+            (block [] $ Call (env "*f") [env "x", float (-1)])
+          ]
+     )),
+    Def "goodenough" (block ["guess", "x"] (
+        Call (env ">f") [
+            (float 0.001),
+            (Call (self "abs") [
+                (Call (env "-f") [
+                    (Call (self "square") [
+                        (local "guess")
+                    ]),
+                    (local "x")
+                ])
+           ])
+        ]
+    )),
+    Def "average" (block ["x", "y"]
+        (Call (env "/f") [
+            (Call (env "+f") [
+                (local "x"),
+                (local "y")
+            ]),
+            (float 2)
+        ])
+       ),
+    Def "improve" (block ["guess", "x"]
+        (Call (self "average") [
+            (local "guess"),
+            (Call (env "/f") [
+                (local "x"),
+                (local "guess")
+            ])
+           ])
+        ),
+    Def "sqrtiter" (block ["guess", "x"]
+        (Call (env "if") [
+            (Call (self "goodenough") [local "guess", local "x"]),
+            (block [] $ env "guess"),
+            (block [] $ (Call (self "sqrtiter") [
+                    (Call (self "improve") [env "guess", env "x"]),
+                    (env "x")
+                ]))
+           ]
+       )),
+    Def "sqrt" (block ["x"] (Call (self "sqrtiter") [float 1, local "x"])),
+    Def "main" (Call (self "sqrt") [float 9])
+  ]
+
+testSqrtIter = modul [
+    Def "square" (block ["x"] (
+        Call (env "*f") [
+            (local "x"),
+            (local "x")
+          ]
+      )),
+    Def "abs" (block ["x"] (
+        Call (env "if") [
+            (Call (env ">f") [local "x", float 0]),
+            (block [] $ env "x"),
+            (block [] $ Call (env "*f") [env "x", float (-1)])
+          ]
+     )),
+    Def "goodenough" (block ["x"] (
+        Call (env ">f") [
+            (float 0.001),
+            (Call (self "abs") [
+                (Call (env "-f") [
+                    (Call (self "square") [
+                        (dyn "guess")
+                    ]),
+                    (local "x")
+                ])
+           ])
+        ]
+    )),
+    Def "average" (block ["x", "y"]
+        (Call (env "/f") [
+            (Call (env "+f") [
+                (local "x"),
+                (local "y")
+            ]),
+            (float 2)
+        ])
+       ),
+    Def "improve" (block ["x"]
+        (Call (self "average") [
+            (dyn "guess"),
+            (Call (env "/f") [
+                (local "x"),
+                (dyn "guess")
+            ])
+           ])
+        ),
+    Def "sqrt" (block ["x"]
+        (Call (env "if") [
+            (Call (self "goodenough") [local "x"]),
+            (block [] $ dyn "guess"),
+            (block [] $ set "guess" (Call (self "improve") [env "x"]))
+           ])
+       ),
+    Def "start" (define "guess" (float 1)),
+    Def "step" (Call (self "sqrt") [float 1234567891011121])
+  ]
+
+testFac = modul [
+    Def "fac" (block ["n"]
+        (Call (env "if") [
+            (Call (env "==") [local "n", num 1]),
+            (block [] $ num 1),
+            (block [] $ (Call (env "*") [
+                env "n",
+                (Call (self "fac") [
+                    (Call (env "-") [
+                        env "n",
+                        num 1
+                      ])
+                  ])
+              ]))
+          ])
+      ),
+    Def "main" (Call (self "fac") [num 1])
+  ]
+testFac2 = modul [
+    Def "fac" (block ["n"]
+        (Call (env "if") [
+            (Call (env "==") [local "n", num 1]),
+            (block [] $ num 1),
+            (block [] $ (Call (env "*") [
+                env "n",
+                (Call (self "fac") [
+                    (Call (env "-") [
+                        env "n",
+                        num 1
+                      ])
+                  ])
+              ]))
+          ])
+      ),
+    Def "main" (Call (self "fac") [num 10])
+  ]
+
+testFib = modul [
+    Def "fib" (block ["n"]
+        (Call (env "if") [
+            (Call (env "==") [local "n", num 0]),
+            (block [] $ num 0),
+            (block [] $ (Call (env "if") [
+                (Call (env "==") [env "n", num 1]),
+                (block [] $ num 1),
+                (block [] $ (Call (env "+") [
+                    (Call (self "fib") [
+                        (Call (env "-") [
+                            env "n",
+                            num 1
+                          ])
+                      ]),
+                    (Call (self "fib") [
+                        (Call (env "-") [
+                            env "n",
+                            num 2
+                          ])
+                      ])
+                    ]))
+              ]))
+          ])
+      ),
+    Def "main" (Call (self "fib") [num 1])
+  ]
+testFib2 = modul [
+    Def "fib" (block ["n"]
+        (Call (env "if") [
+            (Call (env "==") [local "n", num 0]),
+            (block [] $ num 0),
+            (block [] $ (Call (env "if") [
+                (Call (env "==") [env "n", num 1]),
+                (block [] $ num 1),
+                (block [] $ (Call (env "+") [
+                    (Call (self "fib") [
+                        (Call (env "-") [
+                            env "n",
+                            num 1
+                          ])
+                      ]),
+                    (Call (self "fib") [
+                        (Call (env "-") [
+                            env "n",
+                            num 2
+                          ])
+                      ])
+                    ]))
+              ]))
+          ])
+      ),
+    Def "main" (Call (self "fib") [num 7])
+  ]
+
+testPiSum = modul [
+    Def "sum" (block ["term", "a", "next", "b"]
+      (Call (env "if") [
+          Call (env ">f") [local "a", local "b"],
+          block [] $ float 0,
+          block [] $ Call (env "+f") [
+              Call (env "term") [env "a"],
+              Call (self "sum") [
+                  env "term",
+                  Call (env "next") [env "a"],
+                  env "next",
+                  env "b"
+                ]
+            ]
+        ])),
+    Def "piterm" (block ["x"]
+      (Call (env "/f") [
+          float 1,
+          Call (env "*f") [
+              local "x",
+              Call (env "+f") [
+                  local "x",
+                  float 2
+                ]
+            ]
+        ])
+      ),
+    Def "pinext" (block ["x"] (Call (env "+f") [local "x", float 4])),
+    Def "pisum" (block ["a", "b"]
+        (Call (env "*f") [
+            float 8,
+            Call (self "sum") [self "piterm", local "a", self "pinext", local "b"]
+          ])
+      ),
+    Def "inc" (block ["x"] (Call (env "+f") [local "x", float 1])),
+    Def "identity" (block ["x"] (local "x")),
+--    Def "main" (Call (self "pisum") [float 1, float 1000])
+    Def "main" (Call (self "pisum") [float 1, float 90])
+  ]
+
+testPrint = modul [
+    Def "print1" (block [] $ Event Print (num 1)),
+    Def "loop" (Call (self "print1") [])
+  ]
+
+testPrintIntegers = modul [
+    Def "printn" (block [] $ Event Print (dyn "n")),
+    Def "incn" (block [] $ set "n" (Call (env "+") [dyn "n", num 1])),
+    Def "start" (define "n" (num 1)),
+    Def "step" (Combine (Call (self "printn") []) (Call (self "incn") []))
+  ]
+
+testPrintFib = modul [
+    Def "printa" (block [] $ Event Print (dyn "a")),
+    Def "fibit" (block [] $ Combine (set "a" (dyn "b")) (set "b" (
+        Call (env "+") [dyn "a", dyn "b"]
+      ))),
+    Def "start" (Combine (define "a" (num 1)) (define "b" (num 1))),
+    Def "step" (Combine (Call (self "printa") []) (Call (self "fibit") []))
+  ]
+
+testPrintPi = modul [
+    Def "printDigit" (block ["d"] $ Event Print (local "d")),
+    Def "pi" (block [] $ (Call (env "if") [
+        Call (env "<") [ -- 4*q+r-t < n*t
+          Call (env "-") [
+            Call (env "+") [
+              Call (env "*") [num 4, dyn "q"],
+              dyn "r"
+            ],
+            dyn "t"
+          ],
+          Call (env "*") [dyn "n", dyn "t"]
+        ],
+        block [] $
+        combine [
+          Call (self "printDigit") [dyn "n"],
+          superset [
+            ("q", Call (env "*") [num 10, dyn "q"]),
+            ("r", Call (env "*") [
+              num 10,
+              Call (env "-") [
+                dyn "r",
+                Call (env "*") [dyn "n", dyn "t"]
+              ]
+            ]),
+            ("n", Call (env "-") [
+              Call (env "/") [
+                Call (env "*") [
+                  num 10,
+                  Call (env "+") [
+                    dyn "r",
+                    Call (env "*") [num 3, dyn "q"]
+                  ]
+                ],
+                dyn "t"
+              ],
+              Call (env "*") [num 10, dyn "n"]
+            ])
+          ]
+        ],
+        block [] $
+        superset [
+            ("q", Call (env "*") [dyn "q", dyn "k"]),
+            ("r", Call (env "*") [
+              dyn "l",
+              Call (env "+") [
+                dyn "r",
+                Call (env "*") [num 2, dyn "q"]
+              ]
+            ]),
+            ("t", Call (env "*") [dyn "t", dyn "l"]),
+            ("k", Call (env "+") [dyn "k", num 1]),
+            ("n", Call (env "/") [
+              Call (env "+") [
+                Call (env "*") [
+                  dyn "q",
+                  Call (env "+") [
+                    num 2,
+                    Call (env "*") [num 7, dyn "k"]
+                  ]
+                ],
+                Call (env "*") [dyn "r", dyn "l"]
+              ],
+              Call (env "*") [dyn "t", dyn "l"]
+            ]),
+            ("l", Call (env "+") [dyn "l", num 2])
+        ]
+      ])),
+    Def "start" (superdefine [("q",1),("r",0),("t",1),("k",1),("n",3),("l",3)]),
+    Def "step" (Call (self "pi") [])
+  ]
+
+main = do {-
+  evalMainModule testLiteral
+  evalMainModule testSymref
+  evalMainModule testApply
+  evalMainModule testApply2
+  evalMainModule testNative
+  evalMainModule testWrappedNative
+  evalMainModule testCall
+
+  evalMainModule testAdd
+  evalMainModule testAdd2
+  evalMainModule testMult
+  evalMainModule testNested
+  evalMainModule testSquare
+  evalMainModule testSumOfSquares
+  evalMainModule testAbs
+  evalMainModule testAbs2
+  evalMainModule testIf
+  evalMainModule testIf2
+  evalMainModule testAnd
+  evalMainModule testAnd2
+  evalMainModule testAnd3
+  evalMainModule testOr
+  evalMainModule testOr2
+  evalMainModule testOr3
+  evalMainModule testNot
+  evalMainModule testNot2
+  evalMainModule testSqrt
+  evalMainModule testSqrt2
+  evalIterModule testSqrtIter
+  evalMainModule testFac
+  evalMainModule testFac2
+  evalMainModule testFib
+  evalMainModule testFib2
+  evalMainModule testPiSum
+  evalEventLoopModule testPrint
+ evalEventIterModule testPrintIntegers
+ evalEventIterModule testPrintFib-}
+ evalEventIterModule testPrintPi
 
 {-
-testWith:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [with, [
-        [symdef, size],
-        [literal, 2],
-        [block, {
-          type: method,
-          params: [],
-          code:
-            [func, ['+', [
-              [symref, size],
-              [literal, 0]
-            ]]]
-        }]
-      ]]],
-      [symref, io]
-    ]]]
-testWith2:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [with, [
-        [symdef, pi],
-        [literal, 3.14159],
-        [block, {
-          type: method,
-          params: [],
-          code:
-            [func, [with, [
-              [symdef, radius],
-              [literal, 10],
-              [block, {
-                type: method,
-                params: [],
-                code:
-                    [func, ['==', [
-                      [func, ['*', [
-                        [symref, pi],
-                        [func, ['*', [
-                          [symref, radius],
-                          [symref, radius]
-                        ]]]
-                      ]]],
-                      [literal, 314.159]
-                    ]]],
-              }]
-            ]]]
-         }]
-      ]]],
-      [symref, io]
-    ]]]
-sumOfSquares:
-  type: method
-  params: [i, j]
-  code:
-    [func, ["+", [
-      [func, [square, [
-        [symref, i]
-      ]]],
-      [func, [square, [
-        [symref, j]
-      ]]]
-    ]]]
-testSumOfSquares:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, ["==", [
-        [func, [sumOfSquares, [
-          [literal, 4],
-          [literal, 3]
-        ]]],
-        [literal, 25]
-      ]]],
-      [symref, io]
-    ]]]
-abs:
-  type: method
-  params: [x]
-  code:
-    [func, [if, [
-      [func, ['>', [
-        [symref, x],
-        [literal, 0]
-      ]]],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [return, [
-            [symref, x]
-          ]]]
-      }],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, ["*", [
-            [symref, x],
-            [literal, -1]
-          ]]]
-      }]
-    ]]]
-testIf:
-  type: method
-  params: []
-  code:
-    [func, [if, [
-      [literal, True],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [send, [
-            [literal, 'It is true'],
-            [symref, io]
-          ]]]
-      }],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [send, [
-            [literal, 'It is false'],
-            [symref, io]
-          ]]]
-      }]
-    ]]]
-testIf2:
-  type: method
-  params: []
-  code:
-    [func, [if, [
-      [literal, False],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [send, [
-            [literal, 'It is true'],
-            [symref, io]
-          ]]]
-      }],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [send, [
-            [literal, 'It is false'],
-            [symref, io]
-          ]]]
-      }]
-    ]]]
-testAbs:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, ["==", [
-        [func, [abs, [
-          [literal, 5]
-        ]]],
-        [literal, 5]
-      ]]],
-      [symref, io]
-    ]]]
-testAbs2:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, ["==", [
-        [func, [abs, [
-          [literal, -5]
-        ]]],
-        [literal, 5]
-      ]]],
-      [symref, io]
-    ]]]
-testAbs3:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, ["==", [
-        [func, [abs, [
-          [literal, -5]
-        ]]],
-        [func, [abs, [
-          [literal, 5]
-        ]]]
-      ]]],
-      [symref, io]
-    ]]]
-testAnd:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [and, [
-        [literal, true],
-        [literal, false]
-      ]]],
-      [symref, io]
-    ]]]
-testOr:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [or, [
-        [literal, true],
-        [literal, false]
-      ]]],
-      [symref, io]
-    ]]]
-testNot:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [not, [
-        [literal, false]
-      ]]],
-      [symref, io]
-    ]]]
-goodenough:
-  type: method
-  params: [guess, x]
-  code:
-    [func, ["<", [
-      [func, [abs, [
-        [func, ["-", [
-          [func, [square, [
-            [symref, guess]
-          ]]],
-          [symref, x]
-        ]]]
-      ]]],
-      [literal, 0.001]
-    ]]]
-average:
-  type: method
-  params: [x, y]
-  code:
-    [func, ["/", [
-      [func, ["+", [
-        [symref, x],
-        [symref, y]
-      ]]],
-      [literal, 2]
-    ]]]
-improve:
-  type: method
-  params: [guess, x]
-  code:
-    [func, [average, [
-      [symref, guess],
-      [func, ["/", [
-        [symref, x],
-        [symref, guess]
-      ]]]
-    ]]]
-sqrtiter:
-  type: method
-  params: [guess, x]
-  code:
-    [func, [if, [
-      [func, [goodenough, [
-        [symref, guess],
-        [symref, x]
-      ]]],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [return, [
-            [symref, guess]
-          ]]]
-      }],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [sqrtiter, [
-            [func, [improve, [
-              [symref, guess],
-              [symref, x]
-            ]]],
-            [symref, x]
-          ]]]
-      }]
-    ]]]
-sqrt:
-  type: method
-  params: [x]
-  code:
-    [func, [sqrtiter, [
-      [literal, 1],
-      [symref, x]
-    ]]]
-testSqrt:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [sqrt, [
-        [literal, 9]
-      ]]],
-      [symref, io]
-    ]]]
-sqrt2:
-  goodenough2:
-    type: method
-    params: [guess, x]
-    code:
-      [func, ["<", [
-        [func, [abs, [
-          [func, ["-", [
-            [func, [square, [
-              [symref, guess]
-            ]]],
-            [symref, x]
-          ]]]
-        ]]],
-        [literal, 0.001]
-      ]]]
-  average2:
-    type: method
-    params: [x, y]
-    code:
-      [func, ["/", [
-        [func, ["+", [
-          [symref, x],
-          [symref, y]
-        ]]],
-        [literal, 2]
-      ]]]
-  improve:
-    type: method
-    params: [guess, x]
-    code:
-      [func, [average2, [
-        [symref, guess],
-        [func, ["/", [
-          [symref, x],
-          [symref, guess]
-        ]]]
-      ]]]
-  sqrtiter:
-    type: method
-    params: [guess, x]
-    code:
-      [func, [if, [
-        [func, [goodenough2, [
-          [symref, guess],
-          [symref, x]
-        ]]],
-        [block, {
-          type: method,
-          params: [],
-          code:
-            [func, [return, [
-              [symref, guess]
-            ]]]
-        }],
-        [block, {
-          type: method,
-          params: [],
-          code:
-            [func, [sqrtiter2, [
-              [func, [improve2, [
-                [symref, guess],
-                [symref, x]
-              ]]],
-              [symref, x]
-            ]]]
-        }]
-      ]]]
-  type: method
-  params: [x]
-  code:
-    [func, [sqrtiter, [
-      [literal, 1],
-      [symref, x]
-    ]]]
-testSqrt2:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [sqrt2, [
-        [literal, 9]
-      ]]],
-      [symref, io]
-    ]]]
-factorial:
-  type: method
-  params: [n]
-  code:
-    [func, [if, [
-      [func, ["==", [
-        [symref, n],
-        [literal, 1]
-      ]]],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [return, [
-            [literal, 1]
-          ]]]
-      }],
-      [block, {
-         type: method,
-         params: [],
-         code:
-           [func, ["*", [
-             [symref, n],
-             [func, [factorial, [
-               [func, ["-", [
-                 [symref, n],
-                 [literal, 1]
-                ]]]
-              ]]]
-            ]]]
-      }]
-    ]]]
-testFac:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [factorial, [
-        [literal, 1]
-      ]]],
-      [symref, io]
-    ]]]
-testFac2:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [factorial, [
-        [literal, 6]
-      ]]],
-      [symref, io]
-    ]]]
-fib:
-  type: method
-  params: [n]
-  code:
-    [func, [if, [
-      [func, ["==", [
-        [symref, n],
-        [literal, 0]
-      ]]],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [return, [
-            [literal, 0]
-          ]]]
-      }],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [if, [
-            [func, ["==", [
-              [symref, n],
-              [literal, 1]
-            ]]],
-            [block, {
-              type: method,
-              params: [],
-              code:
-                [func, [return, [
-                  [literal, 1]
-                ]]]
-            }],
-            [block, {
-              type: method,
-              params: [],
-              code:
-                [func, ["+", [
-                  [func, [fib, [
-                    [func, ["-", [
-                      [symref, n],
-                      [literal, 1]
-                    ]]]
-                  ]]],
-                  [func, [fib, [
-                    [func, ["-", [
-                      [symref, n],
-                      [literal, 2]
-                    ]]]
-                  ]]]
-                ]]]
-            }]
-          ]]]
-      }]
-    ]]]
-testFib:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [fib, [
-        [literal, 0]
-      ]]],
-      [symref, io]
-    ]]]
-testFib2:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [fib, [
-        [literal, 1]
-      ]]],
-      [symref, io]
-    ]]]
-testFib3:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [fib, [
-        [literal, 2]
-      ]]],
-      [symref, io]
-    ]]]
-testFib4:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [fib, [
-        [literal, 3]
-      ]]],
-      [symref, io]
-    ]]]
-testFib5:
-  type: method
-  params: []
-  code:
-    [func, [send, [
-      [func, [fib, [
-        [literal, 10]
-      ]]],
-      [symref, io]
-    ]]]
-sum:
-  type: method
-  params: [term, a, next, b]
-  code:
-    [func, [if, [
-      [func, [">", [
-        [symref, a],
-        [symref, b]
-      ]]],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, [return, [
-            [literal, 0]
-          ]]]
-      }],
-      [block, {
-        type: method,
-        params: [],
-        code:
-          [func, ["+", [
-            [func, [term, [
-              [symref, a]
-            ]]],
-            [func, [sum, [
-              [symref, term],
-              [func, [next, [
-                [symref, a]
-              ]]],
-              [symref, next],
-              [symref, b]
-            ]]]
-          ]]]
-      }]
-    ]]]
-piterm:
-  type: method
-  params: [x]
-  code:
-    [func, ["/", [
-      [literal, 1.0],
-      [func, ["*", [
-        [symref, x],
-        [func, ["+", [
-          [symref, x],
-          [literal, 2]
-        ]]]
-      ]]]
-    ]]]
-pinext:
-  type: method
-  params: [x]
-  code:
-    [func, ["+", [
-      [symref, x],
-      [literal, 4]
-    ]]]
-pisum:
-  type: method
-  params: [a, b]
-  code:
-    [func, [sum, [
-      [symref, piterm],
-      [symref, a],
-      [symref, pinext],
-      [symref, b]
-    ]]]
-inc:
-  type: method
-  params: [x]
-  code:
-    [func, ["+", [
-      [symref, x],
-      [literal, 1]
-    ]]]
-identity:
-  type: method
-  params: [x]
-  code:
-    [func, ["+", [
-      [symref, x],
-      [literal, 0]
-    ]]]
 intsum:
   type: method
   params: [a, b]
@@ -820,4 +676,59 @@ testFor:
       ]]],
       [symref, io]
     ]]]
+testWith:
+  type: method
+  params: []
+  code:
+    [func, [send, [
+      [func, [with, [
+        [symdef, size],
+        [literal, 2],
+        [block, {
+          type: method,
+          params: [],
+          code:
+            [func, ['+', [
+              [symref, size],
+              [literal, 0]
+            ]]]
+        }]
+      ]]],0.001
+      [symref, io]
+    ]]]
+testWith2:
+  type: method
+  params: []
+  code:
+    [func, [send, [
+      [func, [with, [
+        [symdef, pi],
+        [literal, 3.14159],
+        [block, {
+          type: method,
+          params: [],
+          code:
+            [func, [with, [
+              [symdef, radius],
+              [literal, 10],
+              [block, {
+                type: method,
+                params: [],
+                code:
+                    [func, ['==', [
+                      [func, ['*', [
+                        [symref, pi],
+                        [func, ['*', [
+                          [symref, radius],
+                          [symref, radius]
+                        ]]]
+                      ]]],
+                      [literal, 314.159]
+                    ]]],
+              }]
+            ]]]
+         }]
+      ]]],
+      [symref, io]
+    ]]]        
 -}

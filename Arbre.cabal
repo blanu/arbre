@@ -9,7 +9,7 @@ Build-Type:          Simple
 Cabal-Version:       >=1.8
 
 Library
-  Exposed-modules:   Arbre.Program, Arbre.Print, Arbre.Load, Arbre.Eval, Arbre.Context, Arbre.Native, Arbre.Box
+  Exposed-modules:   Arbre.Program, Arbre.Print, Arbre.Load, Arbre.Eval, Arbre.Context, Arbre.Native, Arbre.Box, Arbre.Mutation
   Build-Depends:     base >= 3 && < 5, cereal, ghc-prim, binary, containers, filepath, json
 
 --Executable create
