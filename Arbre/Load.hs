@@ -9,7 +9,7 @@ import System.FilePath
 import Text.JSON
 import Text.JSON.Generic
 
-import Arbre.Program hiding (Error)
+import Arbre.Expressions hiding (Error)
 import Arbre.View
 
 loadProgram :: FilePath -> IO(Maybe ObjectDef)

@@ -9,8 +9,8 @@ Build-Type:          Simple
 Cabal-Version:       >=1.8
 
 Library
-  Exposed-modules:   Arbre.Program, Arbre.Print, Arbre.Load, Arbre.Eval, Arbre.Context, Arbre.Native, Arbre.Box, Arbre.Mutation
-  Build-Depends:     base >= 3 && < 5, cereal, ghc-prim, binary, containers, filepath, json
+  Exposed-modules:   Arbre.Print, Arbre.Load, Arbre.Eval, Arbre.Context, Arbre.Native, Arbre.Box, Arbre.Mutation, Arbre.Expressions
+  Build-Depends:     base >= 3 && < 5, cereal, ghc-prim, binary, containers, filepath, json, bimap
 
 --Executable create
 --  Main-is:           Arbre/Create.hs
@@ -18,11 +18,11 @@ Library
 
 Executable print
   Main-is:           bin/print.hs
-  Build-Depends:     base >= 3 && < 5, Arbre, cereal, ghc-prim, binary, containers, json, filepath
+  Build-Depends:     base >= 3 && < 5, Arbre, cereal, ghc-prim, binary, containers, json, filepath, bimap
 
 Executable test
   Main-is:           bin/test.hs
-  Build-Depends:     base >= 3 && < 5, Arbre, cereal, ghc-prim, binary, containers, json, filepath
+  Build-Depends:     base >= 3 && < 5, Arbre, cereal, ghc-prim, binary, containers, json, filepath, bimap
 
 --test-suite crypto
 --  type: exitcode-stdio-1.0

@@ -11,7 +11,7 @@ import Data.Typeable
 import Data.Data
 import Data.Map as M
 
-import Arbre.Program
+import Arbre.Expressions
 
 data SourcePath = SourcePath String Path
 data Path = Path [Literal]

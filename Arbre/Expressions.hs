@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
-module Arbre.Program
+module Arbre.Expressions
 (
  ObjectDef(..),
  Object(..),
@@ -14,16 +14,8 @@ module Arbre.Program
  Mapping(..),
  EffectType(..),
  EventType(..),
- unboxInteger,
- unboxFloat,
- boxInteger,
- boxFloat,
- integerError,
- floatError,
- unboxBoolean,
- boxBoolean,
- booleanError,
- typeError
+ ReceiverType(..),
+ Program(..)
 )
 where
 
@@ -32,6 +24,7 @@ import Data.Data
 import Data.Map as M
 
 import Arbre.Box
+import Arbre.NativeTypes
 
 data Interface = Interface [String]
 
@@ -60,14 +53,25 @@ data Expression =
   | Symref Environment String
   | Symdef String
   | Call Expression [Expression]
-  | NativeCall String [Expression]
+  | NativeCall NativeType [Expression]
   | Apply Expression [Expression]
   | BlockExp Block
   | Closure Mapping Mapping Mapping Mapping Block -- lex dyn self value
   | Mutation EffectType Expression Expression -- effect-type symdef value-expression
   | Event EventType Expression
+  | Receiver ReceiverType Expression
   | Combine Expression Expression
+  | ProgramExp Program
   | Error String
+  deriving (Eq, Show, Typeable, Data)
+
+data Program =
+    PrintVal Expression
+  | Emit Expression
+  | Receive Expression Expression
+  | EvalApply Expression Expression
+  | Iterate Expression Program
+  | Sequence Program Program
   deriving (Eq, Show, Typeable, Data)
 
 data EffectType =
@@ -79,35 +83,6 @@ data EventType =
   Print
   deriving (Eq, Show, Typeable, Data)
 
-unboxInteger :: Expression -> Maybe Integer
-unboxInteger (ObjectExp (Object (LiteralState (IntegerLit i)) _)) = Just i
-unboxInteger _ = Nothing
-
-boxInteger :: Integer -> ObjectDef -> Expression
-boxInteger i def = ObjectExp $ Object (LiteralState $ IntegerLit i) def
-
-integerError :: [Expression] -> Expression
-integerError params = Error $ "Type error, not integer literals" ++ (show params)
-
-floatError :: [Expression] -> Expression
-floatError params = Error $ "Type error, not float literals" ++ (show params)
-
-unboxFloat :: Expression -> Maybe Float
-unboxFloat (ObjectExp (Object (LiteralState (FloatLit i)) _)) = Just i
-unboxFloat _ = Nothing
-
-boxFloat :: Float -> ObjectDef -> Expression
-boxFloat f def = ObjectExp $ Object (LiteralState $ FloatLit f) def
-
-unboxBoolean :: Expression -> Maybe Bool
-unboxBoolean (ObjectExp (Object (LiteralState (BooleanLit i)) _)) = Just i
-unboxBoolean _ = Nothing
-
-boxBoolean :: Bool -> ObjectDef -> Expression
-boxBoolean i def = ObjectExp $ Object (LiteralState $ BooleanLit i) def
-
-booleanError :: [Expression] -> Expression
-booleanError params = Error $ "Type error, not boolean literals" ++ (show params)
-
-typeError :: [Expression] -> Expression
-typeError params = Error $ "General type error: " ++ (show params)
+data ReceiverType =
+  Stdin
+  deriving (Eq, Show, Typeable, Data)

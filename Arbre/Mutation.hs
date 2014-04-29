@@ -5,7 +5,7 @@ module Arbre.Mutation
 where
 
 import Arbre.Context
-import Arbre.Program
+import Arbre.Expressions
 
 applyMutation :: Expression -> Context -> Context
 applyMutation (Mutation Define (Symdef sym) value) context =

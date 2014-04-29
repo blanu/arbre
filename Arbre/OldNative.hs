@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable, TypeSynonymInstances, FlexibleInstances #-}
 
-module Arbre.Native
+module Arbre.OldNative
 (
   builtins,
   wrapNatives,
@@ -10,26 +10,21 @@ module Arbre.Native
   builtinContext,
   builtinEnvironment,
   objectContext,
-  nativeName,
-  nativeType,
   Boxable,
   boxString,
-  unboxString,
-  applyNative
+  unboxString
 )
 where
 
-import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Bimap (Bimap, (!), (!>))
-import qualified Data.Bimap as Bi
 import Data.Typeable
 import Data.Data
 import Debug.Trace
 
-import Arbre.Expressions
-import Arbre.Box
+import Arbre.Program
+--import Arbre.Box
 import Arbre.Context
+import Arbre.Print
 import Arbre.View
 import Arbre.NativeTypes
 
@@ -50,57 +45,28 @@ defContext (ObjectDef defs) = fromList $ map unwrapDef defs
 fromList :: [(String,Expression)] -> Mapping
 fromList list = Mapping $ M.fromList list
 
-applyNative :: NativeType -> Native
-applyNative IntegerAdd = add
-applyNative IntegerSubtract = arbre_subtract
-applyNative IntegerMultiply = mult
-applyNative IntegerDivide = divide
-applyNative IntegerEquals = eq
-applyNative IntegerGreaterThan = gt
-applyNative IntegerLessThan = lt
-applyNative FloatAdd = float_add
-applyNative FloatSubtract = float_subtract
-applyNative FloatMultiply = float_mult
-applyNative FloatDivide = float_divide
-applyNative FloatEquals = float_eq
-applyNative FloatGreaterThan = float_gt
---applyNative FloatLessThan = float_lt
-applyNative StringEquals = string_eq
-applyNative Append = string_append
---applyNative BooleanEquals = boolean_eq
-applyNative If = arbre_if
-applyNative And = arbre_and
-applyNative Or = arbre_or
-applyNative Not = arbre_not
-
-builtins :: (Bimap String NativeType)
-builtins = Bi.fromList [
-    ("+", IntegerAdd),
-    ("-", IntegerSubtract),
-    ("*", IntegerMultiply),
-    ("/", IntegerDivide),
-    ("==", IntegerEquals),
-    ("if", If),
-    (">", IntegerGreaterThan),
-    ("<", IntegerLessThan),
-    ("and", And),
-    ("or", Or),
-    ("not", Not),
-    ("+f", FloatAdd),
-    ("-f", FloatSubtract),
-    ("*f", FloatMultiply),
-    ("/f", FloatDivide),
-    ("==f", FloatEquals),
-    (">f", FloatGreaterThan),
-    ("append", Append),
-    ("==s", StringEquals)
+builtins :: (M.Map String Native)
+builtins = M.fromList [
+    ("+", add),
+    ("-", arbre_subtract),
+    ("*", mult),
+    ("/", divide),
+    ("==", eq),
+    ("if", arbre_if),
+    (">", gt),
+    ("<", lt),
+    ("and", arbre_and),
+    ("or", arbre_or),
+    ("not", arbre_not),
+    ("+f", float_add),
+    ("-f", float_subtract),
+    ("*f", float_mult),
+    ("/f", float_divide),
+    ("==f", float_eq),
+    (">f", float_gt),
+    ("append", string_append),
+    ("==s", string_eq)
   ]
-
-nativeType :: String -> NativeType
-nativeType t = builtins ! t
-
-nativeName :: NativeType -> String
-nativeName name = builtins !> name
 
 builtinParams :: (M.Map String [String])
 builtinParams = M.fromList [
@@ -126,24 +92,10 @@ builtinParams = M.fromList [
   ]
 
 functionToMethod :: String -> Def
-functionToMethod name = do
-  let maybeOp = Bi.lookup name builtins
-  case maybeOp of
-    Just op -> Def name (BlockExp $ Block ["x"] (NativeCall op [(Symref Value ""), (Symref Local "x")]))
+functionToMethod op = Def op (BlockExp $ Block ["x"] (NativeCall op [(Symref Value ""), (Symref Local "x")]))
 
 functionsToObject :: [String] -> ObjectDef
 functionsToObject ops = ObjectDef $ map functionToMethod ops
-
-wrapNatives :: (Bimap String NativeType) -> (M.Map String Expression)
-wrapNatives natives = M.mapWithKey wrapNative (Bi.toMap natives)
-
-wrapNative :: String -> NativeType -> Expression
-wrapNative name native = do
-  let key = nativeType name
-  let maybeParams = M.lookup name builtinParams
-  case maybeParams of
-    Just params -> BlockExp $ Block params $ NativeCall key $ map (Symref Local) params
-    Nothing     -> Error $ "No params for " ++ name
 
 numdef :: ObjectDef
 numdef = functionsToObject ["+", "*", "==", ">"]
@@ -343,6 +295,16 @@ string_eq params@(a:b:[]) = do
         (_,Nothing) -> stringError params
         (Just i, Just j) -> box (i==j)
 string_eq params = stringError params
+
+wrapNatives :: (M.Map String Native) -> (M.Map String Expression)
+wrapNatives natives = M.mapWithKey wrapNative natives
+
+wrapNative :: String -> Native -> Expression
+wrapNative key native =
+  let maybeParams = M.lookup key builtinParams
+  in case maybeParams of
+    Just params -> BlockExp $ Block params $ NativeCall key $ map (Symref Local) params
+    Nothing     -> Error $ "No params for " ++ key
 
 class Boxable a where
   box :: a -> Expression

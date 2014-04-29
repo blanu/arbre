@@ -8,25 +8,32 @@ module Arbre.Print
     printObjectFull,
     printArgs,
     printComputation,
+    printComputationContext,
     printContext,
     printPairs,
-    printMapping
+    printMapping,
+    printClosure,
+    printClosureContext
 )
 where
 
 import qualified Data.Map as M
 import qualified Data.List as L
 
-import Arbre.Program
+import Arbre.Expressions
 import Arbre.Box
 import Arbre.View
 import Arbre.Context
+import Arbre.Native
 
 printPairs :: [(String,Expression)] -> String
 printPairs pairs = "(" ++ (L.intercalate "," $ map (printFullBinding "") pairs) ++ ")"
 
 printComputation :: Computation -> String
 printComputation (Computation context exp) = "<<... | " ++ printExpression (Views []) "" exp
+
+printComputationContext :: Computation -> String
+printComputationContext (Computation context exp) = printContext context
 
 printObjectFull :: Views -> String -> Object -> String
 printObjectFull views ind (Module defMap) = printObjectDef views defMap ++ "\n"
@@ -54,7 +61,7 @@ printEnvironment Lex = "^"
 printEnvironment Dyn = "$"
 printEnvironment Self = "~"
 printEnvironment Value = "&"
-printEnvironment Local = ""
+printEnvironment Local = ":"
 
 printParams :: [String] -> String
 printParams params = L.intercalate ", " params
@@ -76,21 +83,28 @@ printExpression views ind (Error message) = "<error: " ++ message ++ ">"
 printExpression views ind (Mutation Define sym value) = ind ++ (printExpression views ind sym) ++ " := " ++ printExpression views ind value
 printExpression views ind (Mutation Set sym value) = ind ++ (printExpression views ind sym) ++ " = " ++ printExpression views ind value
 printExpression views ind (Event Print value) = ind ++ "io <- " ++ printExpression views ind value
+printExpression views ind (Receiver Stdin block@(BlockExp (Block args exp))) = ind ++ "io -> " ++ printParams args ++ " do " ++ printExpression views ind block
+printExpression views ind (Receiver Stdin clos@(Closure _ _ _ _ _)) = ind ++ "io -> " ++ printClosure views ind clos
 printExpression views ind (Combine a b) = ind ++ (printExpression views ind a) ++ "; " ++ printExpression views ind b
 printExpression views ind exp = "<print not implemented>" ++ show exp
 
 printClosure :: Views -> String -> Expression -> String
 printClosure views ind (Closure lex dyn self value block) =
   "{...|" ++ printNestedBlock views ind block ++ "}"
---printClosure views ind (Closure lex dyn self value block) =
---  "{" ++ printMapping Lex lex ++ ", " ++ printMapping Dyn dyn ++ ", " ++ printMapping Self self ++ "," ++ printMapping Value value ++ "|" ++ printNestedBlock views ind block ++ "}"
+
+printClosureContext :: Views -> String -> Expression -> String
+printClosureContext views ind (Closure lex dyn self value block) =
+  "{" ++ printMapping Lex lex ++ ", " ++ printMapping Dyn dyn ++ ", " ++ printMapping Self self ++ "," ++ printMapping Value value ++ "|" ++ printNestedBlock views ind block ++ "}"
 
 printContext :: Context -> String
 printContext (Context lex dyn self value local) =
   "{" ++ printMapping Lex lex ++ ", " ++ printMapping Dyn dyn ++ ", " ++ printMapping Self self ++ "," ++ printMapping Value value ++ "," ++ printMapping Local local ++ "}"
 
 printMapping :: Environment -> Mapping -> String
-printMapping env (Mapping mapping) = L.intercalate "," $ map (printBinding (printEnvironment env)) (M.toList mapping)
+printMapping env (Mapping mapping) =
+  if length (M.toList mapping) == 0
+    then printEnvironment env ++ "None"
+    else L.intercalate "," $ map (printBinding (printEnvironment env)) (M.toList mapping)
 
 printBinding :: String -> (String, Expression) -> String
 --printBinding prefix (name, value) = prefix ++ name ++ ": " ++ printExpression (Views []) "" value
@@ -112,7 +126,8 @@ printCallWithView views ind (View name (part:parts)) call@(Call _ args) =
     printViewPartWithCall views ind part args ++ " " ++ printCallWithView views ind (View name parts) call
 
 printNativeCall :: Views -> String -> Expression -> String
-printNativeCall views ind call@(NativeCall name args) =
+printNativeCall views ind call@(NativeCall native args) = do
+    let name = nativeName native
     case (getView views name) of
         Just view -> printCallWithView views ind view call
         Nothing -> "#" ++ name ++ "(" ++ (printArgs views ind args) ++ ")"

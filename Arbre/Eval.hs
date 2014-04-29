@@ -7,7 +7,10 @@ module Arbre.Eval
     evalMainModule,
     evalIterModule,
     evalEventLoopModule,
-    evalEventIterModule
+    evalEventIterModule,
+    evalReceiverIterModule,
+    evalProgram,
+    supereval
 )
 where
 
@@ -16,14 +19,17 @@ import Data.Data
 import qualified Data.Map as M
 import Data.Either
 import qualified Debug.Trace as T
+import qualified Data.Bimap as Bi
 
-import Arbre.Program
+import Arbre.Expressions
 import Arbre.Path
 import Arbre.Native
 import Arbre.Print
 import Arbre.View
 import Arbre.Mutation
 import Arbre.Context as C
+import Arbre.Event
+import Arbre.Receiver
 
 data ValueChain = ValueChain SourcePath [Value]
 
@@ -44,11 +50,11 @@ wrap exp = Computation emptyContext exp
 
 eval :: Computation -> Computation
 eval comp@(Computation context lit@(ObjectExp _)) = wrap lit
-eval comp@(Computation context mut@(Mutation _ _ _)) = wrap mut
 eval comp@(Computation context event@(Event _ _)) = wrap event
 eval comp@(Computation context comb@(Combine _ _)) = wrap comb
 eval comp@(Computation context error@(Error _)) = wrap error
 eval comp@(Computation context closure@(Closure _ _ _ _ _)) = wrap closure
+eval comp@(Computation context (Receiver rec exp)) = wrap $ Receiver rec (evalToLiteral (Computation context exp))
 eval (Computation context (Mutation effect sym value)) = wrap $ Mutation effect sym (evalToLiteral (Computation context value))
 eval (Computation context blockExp@(BlockExp _)) = wrap $ C.close context blockExp
 eval (Computation context (Symref env symref)) = wrap $ C.resolve env symref context
@@ -60,13 +66,14 @@ eval (Computation context app@(Apply block@(BlockExp (Block args exp)) params)) 
       let context'    = apply context args params'
       let closure     = C.close context' block
       Computation context' closure
-eval (Computation context app@(Apply (Closure lex dyn self value (Block args exp)) params)) = do
-  let eitherParams'     = resolveParams context params
+eval (Computation context app@(Apply closure@(Closure lex dyn self value (Block args exp)) params)) = do
+  let context' = open closure
+  let eitherParams'     = resolveParams context' params
   case eitherParams' of
     Left error -> wrap error
     Right params' -> do
-      let context'    = apply context args params'
-      Computation context' exp
+      let context''    = apply context' args params'
+      Computation context'' exp
 eval (Computation context nat@(NativeCall name params)) = do
   let eitherParams' = resolveParams context params
   case eitherParams' of
@@ -75,13 +82,10 @@ eval (Computation context nat@(NativeCall name params)) = do
       case params == params' of
         False -> Computation context $ NativeCall name params'
         True  -> do
-          let maybeFunc = M.lookup name builtins
-          case maybeFunc of
-            Just f  -> do
-                let result = f params'
-                let context' = C.stack context
-                Computation context' result
-            Nothing -> wrap $ Error $ "Unknown native function " ++ name
+          let f = applyNative name
+          let result = f params'
+          let context' = C.stack context
+          Computation context' result
 eval (Computation context call@(Call (Symref env name) params)) = do
   let eitherParams' = resolveParams context params
   case eitherParams' of
@@ -98,10 +102,11 @@ eval (Computation context call@(Call (Symref env name) params)) = do
             otherwise -> wrap $ Error $ "Call to a non-function " ++ name ++ ": " ++ show maybeFunc
 eval (Computation context exp) = wrap $ Error $ "unimplemented eval: " ++ show exp
 
-evalBlock :: Environment -> C.Context -> [Expression] -> Block -> Computation
-evalBlock env (C.Context lex dyn self value local) params block = do
-    let context' = C.Context lex dyn self value local
-    let expr = Apply (Closure lex dyn self value block) params
+evalBlock :: Environment -> Context -> [Expression] -> Block -> Computation
+evalBlock env (Context lex dyn self value local) params block = do
+    let context' = Context lex dyn self value local
+    let closure = C.close context' (BlockExp block)
+    let expr = Apply closure params
     Computation context' expr
 
 evalClosure :: Context -> Expression -> [Expression] -> Computation
@@ -111,6 +116,7 @@ evalClosure context closure@(Closure _ _ _ _ _) params = do
 evalToLiteral :: Computation -> Expression
 evalToLiteral (Computation context lit@(ObjectExp _)) = lit
 evalToLiteral (Computation context error@(Error _)) = error
+evalToLiteral (Computation context (Receiver rec exp)) = Receiver rec (evalToLiteral (Computation context exp))
 evalToLiteral (Computation context (Mutation effect sym value)) = Mutation effect sym (evalToLiteral (Computation context value))
 evalToLiteral (Computation context (Event event value)) = Event event $ evalToLiteral $ Computation context value
 evalToLiteral (Computation context (Combine a b)) = Combine (evalToLiteral $ Computation context a) (evalToLiteral $ Computation context b)
@@ -121,7 +127,7 @@ evalToLiteral comp@(Computation context sym@(Symref env symref)) =
       exp'  = discardContext comp'
       ss    = printExpression (Views []) "" sym
       cs    = printExpression (Views []) "" exp'
---  in trace (ss ++ ": " ++ cs) exp'
+--  in trace ("etl symref " ++ ss ++ ": " ++ cs) exp'
   in exp'
 evalToLiteral comp@(Computation context exp@(Call _ _)) = trace (printExpression (Views []) "" exp) $ evalToLiteral $ eval comp
 evalToLiteral comp@(Computation context exp@(NativeCall _ _)) = trace (printExpression (Views []) "" exp) $ evalToLiteral $ eval comp
@@ -164,10 +170,6 @@ evalEventStep comp@(Computation context exp) =
           T.trace (printExpression (Views []) "" comb) $ evalEventStep $ Computation context' exp
         otherwise            -> putStrLn $ show $ Error $ "event step returned unsupported type: " ++ show result
 
-applyEvent :: EventType -> Expression -> IO()
-applyEvent Print value = putStrLn $ printExpression (Views []) "" value
-applyEvent event value = putStrLn $ "Unsupported event type: " ++ show event
-
 applyCombine :: Expression -> Context -> IO Context
 applyCombine (Combine (Event event value) mut@(Mutation _ _ _)) context = do
   applyEvent event value
@@ -200,7 +202,7 @@ applyCombine (Combine comb@(Combine _ _) comb2@(Combine _ _)) context = do
 discardContext :: Computation -> Expression
 discardContext (Computation context exp) = exp
 
-resolveParams :: C.Context -> [Expression] -> Either Expression [Expression]
+resolveParams :: Context -> [Expression] -> Either Expression [Expression]
 resolveParams context params = do
   let comps = map (Computation context) params
   let params' = map evalToLiteral comps
@@ -211,7 +213,7 @@ checkParams [] original = Right original
 checkParams (error@(Error message):params) original = Left error
 checkParams (_:params) original = checkParams params original  
 
-apply :: C.Context -> [String] -> [Expression] -> C.Context
+apply :: Context -> [String] -> [Expression] -> Context
 apply context args params =
   let pairs = zip args params
       context' = C.stack context
@@ -309,3 +311,113 @@ activateNamed name modul = do
     let context = objectContext modul
     let main = C.resolve Self name context
     Computation context main
+
+evalReceiverIterModule :: Expression -> IO()
+evalReceiverIterModule (ObjectExp modul) = do
+  putStrLn $ "module: \n" ++ printObjectFull (Views []) "" modul
+  let start@(Computation _ cexp) = activateIterStart modul
+  putStrLn $ "start: " ++ printExpression (Views []) "" cexp
+  let definitions = evalToLiteral start
+  putStrLn $ "definitions: " ++ printExpression (Views []) "" definitions
+  let (Computation context stepExp) = activateMain modul
+
+  case definitions of
+    defs@(Mutation _ _ _) -> evalReceiverStep $ Computation (applyMutation definitions context) stepExp
+    defs@(Combine _ _)    -> do
+      context' <- applyCombine definitions context
+      evalReceiverStep $ Computation context' stepExp
+    otherwise -> putStrLn $ "Unsupported receiver definitions " ++ show definitions
+evalReceiverEventModule _ = return ()
+
+evalReceiverStep :: Computation -> IO()
+evalReceiverStep comp@(Computation context exp) = do
+    let result = evalToLiteral comp
+    case result of
+        obj@(ObjectExp _) -> do
+          putStrLn $ "Got result: " ++ printExpression (Views[]) "" obj
+        rec@(Receiver receiver rexp) -> do
+          comp'@(Computation context' rexp) <- applyReceiver receiver rexp context
+          let exp = evalToLiteral comp'
+          evalReceiverStep $ Computation context' exp
+        (Event event value) -> do
+          let value' = evalToLiteral $ Computation context value
+          applyEvent event value'
+        (Combine event@(Event _ _) receiver@(Receiver _ _)) -> do
+          evalReceiverStep $ Computation context event
+          evalReceiverStep $ Computation context receiver
+        (Error error) -> putStrLn $ "Error: " ++ error
+        otherwise            -> putStrLn $ show $ Error $ "er event step returned unsupported type: " ++ show result
+
+receiverEvalToLiteral :: Computation -> IO Expression
+receiverEvalToLiteral (Computation context (Receiver receiver rexp)) = do
+  comp@(Computation rcontext rvalue) <- applyReceiver receiver rexp context
+  let value = evalToLiteral comp
+  case value of
+    rec@(Receiver _ _) -> receiverEvalToLiteral $ Computation context value
+    otherwise          -> return value
+
+evalProgram :: Expression -> IO()
+evalProgram (ObjectExp modul) = do
+  let (Computation context stepExp) = activateMain modul
+
+  case stepExp of
+    (ProgramExp program) -> applyProgram context program
+    otherwise -> putStrLn $ "Unsupported expression for evalProgram " ++ show stepExp
+evalProgram _ = return ()
+
+applyProgram :: Context -> Program -> IO()
+applyProgram context (PrintVal value) = do
+  putStrLn $ printExpression (Views []) "" $ evalToLiteral $ Computation context value
+applyProgram context (Emit exp) = do
+  let exp' = evalToLiteral $ Computation context exp
+  case exp' of
+    (Event event value) -> applyEvent event $ evalToLiteral $ Computation context value
+    otherwise           -> putStrLn $ "Type error, can't emit non-events: " ++ show exp'
+applyProgram context (Sequence first second) = do
+  applyProgram context first
+  applyProgram context second
+applyProgram context (Receive first second) = do
+  case first of
+    (Receiver receiver value) -> do
+      comp <- applyReceiver receiver (evalToLiteral $ Computation context value) context
+      return ()
+    otherwise           -> putStrLn $ "Type error, can't receive non-receivers: " ++ show first
+applyProgram context (Iterate exp prog) = do
+  case exp of
+    (Receiver receiver value) -> do
+      (Computation context' exp') <- applyReceiver receiver (evalToLiteral $ Computation context value) context
+      applyProgram context' (Iterate exp' prog)
+    otherwise           -> return ()
+
+supereval :: Expression -> IO()
+supereval (ObjectExp modul) = do
+  let comp@(Computation context stepExp) = activateMain modul
+  let exp' = evalToLiteral comp
+
+  superevalLoop $ Computation context exp'
+
+superevalLoop :: Computation -> IO()
+superevalLoop comp = do
+  putStrLn "---------------------------------------"
+  putStrLn $ "superevalLoop: " ++ printComputation comp
+--  putStrLn $ "superevalLoop: " ++ show comp
+  maybeComp <- superevalIter comp
+  case maybeComp of
+    Just comp' -> superevalLoop comp'
+    Nothing    -> return ()
+
+superevalIter :: Computation -> IO(Maybe Computation)
+superevalIter comp@(Computation context exp) = do
+  let comp'@(Computation context' exp') = Computation context $ evalToLiteral comp
+  case exp' of
+    (Event event value) -> do
+      applyEvent event $ evalToLiteral $ Computation context' value
+      return Nothing
+    (Combine first second) -> do
+      val <- superevalIter $ Computation context' first
+      return $ Just $ Computation context' second
+    (Receiver receiver value) -> do
+      comp'' <- applyReceiver receiver value context'
+      return $ Just comp''
+    otherwise -> return $ Just $ comp'
+

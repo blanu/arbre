@@ -1,7 +1,9 @@
-import Arbre.Program
+import Arbre.Expressions
 import Arbre.Box
 import Arbre.Eval
 import Arbre.Short
+import Arbre.NativeTypes
+import Arbre.Native
 
 testLiteral = modul [Def "main" (num 486)]
 testSymref = modul [
@@ -16,13 +18,13 @@ testApply2 = modul [
     Def "main" (Apply (block ["y"] $ Symref Local "y") [Symref Self "x"])
   ]
 testNative = modul [
-    Def "main" (NativeCall "+" [(num 1), (num 2)])
+    Def "main" (NativeCall IntegerAdd [(num 1), (num 2)])
   ]
 testWrappedNative = modul [
     Def "main" (Call (env "+") [(num 1), (num 2)])
   ]
 testCall = modul [
-    Def "addone" (block ["x"] (NativeCall "+" [(num 1), (local "x")])),
+    Def "addone" (block ["x"] (NativeCall IntegerAdd [(num 1), (local "x")])),
     Def "main" (Call (self "addone") [(num 2)])
   ]
 
@@ -573,6 +575,170 @@ testPrintPi = modul [
     Def "step" (Call (self "pi") [])
   ]
 
+testEchoStdin = modul [
+    Def "main" (Receiver Stdin (block ["input"] $ Event Print (local "input")))
+  ]
+
+testReadline = modul [
+    Def "getline" (block ["buffer", "char"] (
+     Call (env "if") [
+        (Call (env "==s") [local "char", string "\n"]),
+        block [] (env "buffer"),
+        block [] $ (Receiver Stdin $ block ["input"] (
+          Call (self "getline") [
+            Call (env "append") [env "buffer", env "char"],
+            local "input"
+           ]
+         ))
+      ]
+     )),
+     Def "readline" (block [] (
+       Receiver Stdin (block ["input"] $ (
+         Call (self "getline") [string "", local "input"]
+        ))
+      )),
+     Def "main" (Call (self "readline") [])
+  ]
+
+testReadline2 = modul [
+    Def "getline" (block ["buffer", "char"] (
+     Call (env "if") [
+        (Call (env "==s") [local "char", string "\n"]),
+        block [] (prnt $ env "buffer"),
+        block [] $ (Receiver Stdin $ block ["input"] (
+          Call (self "getline") [
+            Call (env "append") [env "buffer", env "char"],
+            local "input"
+           ]
+         ))
+      ]
+     )),
+     Def "readline" (block [] (
+       Receiver Stdin (block ["input"] $ (
+         Call (self "getline") [string "", local "input"]
+        ))
+      )),
+     Def "main" (Call (self "readline") [])
+  ]
+
+testReadline3 = modul [
+    Def "getline" (block ["buffer", "char"] (
+     Call (env "if") [
+        (Call (env "==s") [local "char", string "\n"]),
+        block [] (prnt $ env "char"),
+        block [] $ (Combine (prnt $ env "char")
+         (stdin (Call (self "getline") [
+             Call (env "append") [env "buffer", env "char"],
+             local "input"
+            ]))
+         )
+      ]
+     )),
+     Def "readline" (block [] $ stdin $ Call (self "getline") [
+       string "", local "input"
+      ]),
+     Def "main" (Call (self "readline") [])
+  ]
+
+testHelloWorld = modul [
+    Def "getline" (block ["char"] (
+     Call (env "if") [
+        (Call (env "==s") [local "char", string "\n"]),
+        block [] $ (Call (local "sayHello") []),
+        block [] $ (Combine
+           (set "buffer" (Call (env "append") [dyn "buffer", env "char"]))
+           (stdin $ block ["input"] (Call (self "getline") [local "input"]))
+         )
+      ]
+     )),
+     Def "sayHello" (block ["name"] (
+       prnt $ Call (env "append") [
+         string "Hello, ",
+         local "name"
+        ]
+      )),
+     Def "helloworld" (block [] $ Combine
+       (prnt $ string "What is your name?")
+       (stdin $ block ["input"] (Call (self "getline") [local "input"]))
+      ),
+     Def "start" (define "buffer" (boxString "")),
+     Def "main" (Call (self "helloworld") [])
+  ]
+
+testPrograms = modul [
+  Def "main" $ ProgramExp $ Emit $ Event Print $ boxString "hello world"
+ ]
+
+testPrograms2 = modul [
+  Def "main" (ProgramExp $ Sequence
+    (Emit $ Event Print $ boxString "hello")
+    (Emit $ Event Print $ boxString "world")
+   )
+ ]
+
+testPrograms3 = modul [
+  Def "helloworld" (block [] $ prnt $ string "hello world"),
+  Def "main" $ ProgramExp $ Emit (Call (self "helloworld") [])
+ ]
+
+testSuper = modul [
+     Def "sayHello" (block ["name"] (
+       prnt $ Call (env "append") [
+         string "Hello, ",
+         local "name"
+        ]
+      )),
+     Def "helloworld" (block [] $ Combine
+       (prnt $ string "What is your name?")
+       (stdin $ Call (self "sayHello") [local "input"])
+      ),
+     Def "main" (Call (self "helloworld") [])
+ ]
+
+testSuper2 = modul [
+     Def "getline" (block ["callback"] (stdin $ Call (env "callback") [local "input"])),
+     Def "sayHello" (block ["name"] (
+       prnt $ Call (env "append") [
+         string "Hello, ",
+         local "name"
+        ]
+      )),
+     Def "helloworld" (block [] $ Combine
+       (prnt $ string "What is your name?")
+       (Call (self "getline") [
+         block ["line"] $ Call (self "sayHello") [local "line"]
+        ])
+      ),
+     Def "main" (Call (self "helloworld") [])
+ ]
+
+testSuper3 = modul [
+    Def "readline" (block ["callback", "buffer"] (stdin $
+     (Call (env "if") [
+        (Call (env "==s") [local "input", string "\n"]),
+        block [] $ (Call (env "callback") [env "buffer"]),
+        block [] $ (stdin $ (Call (self "getline") [
+          env "callback",
+          Call (env "append") [env "buffer", local "input"]
+         ]))
+      ])
+     )),
+     Def "getline" (block ["callback"] (Call (self "readline") [local "callback", boxString ""])),
+     Def "sayHello" (block ["name"] (
+       prnt $ Call (env "append") [
+         string "Hello, ",
+         local "name"
+        ]
+      )),
+     Def "helloworld" (block [] $ Combine
+       (prnt $ string "What is your name?")
+       (Call (self "getline") [
+         block ["line"] $ Call (self "sayHello") [local "line"]
+        ])
+      ),
+     Def "main" (Call (self "helloworld") [])
+ ]
+  
 main = do {-
   evalMainModule testLiteral
   evalMainModule testSymref
@@ -609,9 +775,20 @@ main = do {-
   evalMainModule testFib2
   evalMainModule testPiSum
   evalEventLoopModule testPrint
- evalEventIterModule testPrintIntegers
- evalEventIterModule testPrintFib-}
- evalEventIterModule testPrintPi
+  evalEventIterModule testPrintIntegers
+  evalEventIterModule testPrintFib
+  evalEventIterModule testPrintPi-}
+--  evalReceiverEventModule testEchoStdin
+--  evalReceiverIterModule testReadline
+--  evalReceiverIterModule testReadline2
+--  evalReceiverIterModule testReadline3
+--  evalReceiverIterModule testHelloWorld
+--  evalProgram testPrograms
+--  evalProgram testPrograms2
+--  evalProgram testPrograms3
+--  supereval testSuper
+--  supereval testSuper2
+  supereval testSuper3
 
 {-
 intsum:

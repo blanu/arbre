@@ -2,7 +2,6 @@
 
 module Arbre.Context
 (
-  Context(..),
   Computation(..),
   empty,
   emptyContext,
@@ -12,7 +11,8 @@ module Arbre.Context
   unwrapDef,
   bindPair,
   stack,
-  close
+  close,
+  open
 )
 where
 
@@ -20,7 +20,7 @@ import Data.Typeable
 import Data.Data
 import qualified Data.Map as M
 
-import Arbre.Program
+import Arbre.Expressions
 
 data Computation = Computation Context Expression deriving (Eq, Show)
 
@@ -78,5 +78,7 @@ stack :: Context -> Context
 stack (Context lex dyn self value local) = Context (chainMapping lex local) dyn self value empty
 
 close :: Context -> Expression -> Expression
-close (Context lex dyn self value local) (BlockExp block) = Closure lex dyn self value block
+close (Context lex dyn self value local) (BlockExp block) = Closure (chainMapping lex local) dyn self value block
 
+open :: Expression -> Context
+open (Closure lex dyn self value _) = Context lex dyn self value empty

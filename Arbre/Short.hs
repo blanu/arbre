@@ -3,6 +3,7 @@ module Arbre.Short
     num,
     float,
     bool,
+    string,
     block,
     modul,
     self,
@@ -15,11 +16,13 @@ module Arbre.Short
     set,
     combine,
     superdefine,
-    superset
+    superset,
+    prnt,
+    stdin
 )
 where
 
-import Arbre.Program
+import Arbre.Expressions
 import Arbre.Box
 import Arbre.Native
 import Arbre.Objects
@@ -43,6 +46,13 @@ bool i = do
     let lit = BooleanLit i
     let state = LiteralState lit
     let obj = Object state numdef
+    ObjectExp obj
+
+string :: String -> Expression
+string i = do
+    let lit = StringLit i
+    let state = LiteralState lit
+    let obj = Object state stringdef
     ObjectExp obj
 
 true :: Expression
@@ -90,3 +100,9 @@ setPair (k,v) = set k v
 combine :: [Expression] -> Expression
 combine (d:d2:[]) = Combine d d2
 combine (d:defs) = Combine d $ combine defs
+
+prnt :: Expression -> Expression
+prnt exp = Event Print exp
+
+stdin :: Expression -> Expression
+stdin exp = Receiver Stdin $ block ["input"] exp
